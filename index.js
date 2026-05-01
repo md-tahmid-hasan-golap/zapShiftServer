@@ -35,6 +35,14 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
     await client.connect();
 
+    const parcelsCollection = client.db('zapshift').collection('parcels');
+
+
+    app.post("/parcels", async(req, res)=>{
+        const newParcel = req.body;
+        const result = await parcelsCollection.insertOne(newParcel);
+        res.send(result);
+    })
 
 
 
