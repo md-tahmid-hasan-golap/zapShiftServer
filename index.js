@@ -38,6 +38,9 @@ async function run() {
     const parcelsCollection = client.db('zapshift').collection('parcels');
 
 
+
+
+// parcel post api
     app.post("/parcels", async(req, res)=>{
         const newParcel = req.body;
         const result = await parcelsCollection.insertOne(newParcel);
@@ -46,6 +49,28 @@ async function run() {
 
 
 
+    //  parcel get api all Parcels
+    app.get("/allParcels", async(req, res) => {
+  
+      const result = await parcelsCollection.find(query).toArray();
+      res.send(result);
+    })
+
+
+
+
+       // may parcel get api
+       app.get("/myParcel", async(req, res) => {
+        const query = {};
+        const {email} = req.query;
+        if(email){
+          query.senderEmail = email;
+        }
+
+
+        const result = await parcelsCollection.find(query).toArray();
+        res.send(result);
+       })
 
 
 
