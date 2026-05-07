@@ -52,7 +52,7 @@ async function run() {
     //  parcel get api all Parcels
     app.get("/allParcels", async(req, res) => {
   
-      const result = await parcelsCollection.find(query).toArray();
+      const result = await parcelsCollection.find().toArray();
       res.send(result);
     })
 
@@ -60,15 +60,12 @@ async function run() {
 
 
        // may parcel get api
-       app.get("/myParcel", async(req, res) => {
-        const query = {};
-        const {email} = req.query;
-        if(email){
-          query.senderEmail = email;
-        }
+       app.get("/myParcel/:email", async(req, res) => {
 
-
-        const result = await parcelsCollection.find(query).toArray();
+        const email = req.params.email;
+        const query = {senderEmail: email};
+        const result = await parcelsCollection.find(query).toArray(); 
+        
         res.send(result);
        })
 
