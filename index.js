@@ -2,7 +2,7 @@ require('dotenv').config()
 const express = require('express');
 const cors = require('cors');
 const app = express();
-const { MongoClient, ServerApiVersion } = require('mongodb');
+const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const port = process.env.PORT || 3000;
 
 
@@ -65,16 +65,29 @@ async function run() {
 
         const email = req.params.email;
         const query = {senderEmail: email};
-        const result = await parcelsCollection.find(query).toArray(); 
-        
+        const sort=  {sort: {createdAt: -1} }
+        const result = await parcelsCollection.find(query,sort).toArray(); 
         res.send(result);
        })
 
 
+         // delete parcel api
+         app.delete("/deleteParcel/:id", async (req, res) => {
+          const id = req.params.id;
+          const quaery = {_id: new ObjectId(id)};  
+          const result = await parcelsCollection.deleteOne(quaery);
+          res.send(result);
+         })
+
+          // parcel details api
+          app.get("/parcel/:id", async(req, res) => {
+            const id = req.params.id;  
+            const query = {_id: new ObjectId(id)};
+            const result = await parcelsCollection.findOne(query);
+            res.send(result); 
 
 
-
-
+          } )
 
 
 
