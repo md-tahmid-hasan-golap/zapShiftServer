@@ -3,6 +3,8 @@ const express = require('express');
 const cors = require('cors');
 const app = express();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
+
 const port = process.env.PORT || 3000;
 
 
@@ -90,9 +92,72 @@ async function run() {
           } )
 
 
+            // payment api
 
+          // app.post("/create-checkout-session", async (req, res) => {
+          //   const paymentInfo = req.body;
+          //   const amount = parseInt(paymentInfo.cost ) * 100; 
+          //   const session  = await stripe.checkout.sessions.create({
 
+          //           ui_mode: "elements",
+          //           line_items: [
+          //            {
+                   
+          //         price_data : {
+          //           currency: 'usd',
+          //           unit_amount : amount,
+          //           product_data: {
+          //             name: paymentInfo.parcelName,
+          //           }
+          //         },
+          //            quantity: 1,
+          //         },
+          //   ],
+          //     customer_email: paymentInfo.senderEmail,
 
+          //     mode: 'payment',
+          //     metadata: {
+          //       parcelId: paymentInfo.parcelId,
+
+          //     },
+          //     return_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success`,
+          //     cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancel`,
+          // });
+          //    console.log(session);
+          //    res.send({url: session.url});
+
+          // })
+
+app.post("/create-checkout-session", async (req, res) => {
+  try {
+    const paymentInfo = req.body;
+    const amount = parseInt(paymentInfo.cost) * 100;
+
+    const session = await stripe.checkout.sessions.create({
+      
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            unit_amount: amount,
+            product_data: {
+              name: paymentInfo.parcelName,
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      customer_email: paymentInfo.senderEmail,
+      mode: 'payment',
+      success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success`, 
+      cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancel`,
+    });
+
+    res.send({ url: session.url }); 
+  } catch (error) {
+    res.status(400).send({ error: error.message });
+  }
+});
 
 
 
