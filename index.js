@@ -6,6 +6,15 @@ const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const stripe = require("stripe")(process.env.STRIPE_SECRET_KEY);
 
 const port = process.env.PORT || 3000;
+const crypto = require('crypto');
+
+
+function generateTrackingId() {
+const prefix = 'PRCL';
+const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
+const random = crypto.randomBytes(3).toString('hex').toUpperCase();
+return `${prefix}-${date}-${random}`;
+}
 
 
 
@@ -38,6 +47,7 @@ async function run() {
     await client.connect();
 
     const parcelsCollection = client.db('zapshift').collection('parcels');
+    const paymentsCollection = client.db('zapshift').collection('payments');
 
 
 
@@ -128,6 +138,7 @@ async function run() {
 
           // })
 
+
 app.post("/create-checkout-session", async (req, res) => {
   try {
     const paymentInfo = req.body;
@@ -149,7 +160,10 @@ app.post("/create-checkout-session", async (req, res) => {
       ],
       customer_email: paymentInfo.senderEmail,
       mode: 'payment',
-      success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success`, 
+      metadata: {
+        parcelId: paymentInfo.parcelId,
+      },
+      success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`, 
       cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancel`,
     });
 
@@ -160,11 +174,84 @@ app.post("/create-checkout-session", async (req, res) => {
 });
 
 
+app.post("/payment-checkout-session", async (req, res) => {
+  try {
+    const paymentInfo = req.body;
+    const amount = parseInt(paymentInfo.cost) * 100;
+
+    const session = await stripe.checkout.sessions.create({
+      
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            unit_amount: amount,
+            product_data: {
+              name: paymentInfo.parcelName,
+            },
+          },
+          quantity: 1,
+        },
+      ],
+      customer_email: paymentInfo.senderEmail,
+      mode: 'payment',
+      metadata: {
+        parcelId: paymentInfo.parcelId,
+        parcelName: paymentInfo.parcelName,
+      },
+      success_url: `${process.env.SITE_DOMAIN}/dashboard/payment-success?session_id={CHECKOUT_SESSION_ID}`, 
+      cancel_url: `${process.env.SITE_DOMAIN}/dashboard/payment-cancel`,
+    });
+
+    res.send({ url: session.url }); 
+  } catch (error) {
+    res.status(400).send({ error: error.message });
+  }
+});
+
+
+app.patch("/payment-success", async(req, res ) => {
+  const sessionId = req.query.session_id;
+  const session = await stripe.checkout.sessions.retrieve(sessionId);
+  const trackingId = generateTrackingId();
+  console.log(session);
+  if(session.payment_status === "paid"){
+    const id = session.metadata.parcelId;
+    const query = {_id: new ObjectId(id)};
+    const updateDoc = {
+     $set: {
+      paymentStatus: "paid",
+      transactionId: trackingId,
+     }
+  }
+  const result = await parcelsCollection.updateOne(query, updateDoc);
+
+  const paymentRecord = {
+    amount: session.amount_total / 100,
+    crurrency: session.currency,
+    customerEmail: session.customer_email,
+    parcelId: session.metadata.parcelId,
+    parcelName: session.metadata.parcelName,
+    transactionId: session.payment_intent,
+    paymentStatus: session.payment_status,
+    paidAt: new Date(),
+   
+
+  }
+  if(session.payment_status === "paid"){
+    const paymentResult = await paymentsCollection.insertOne(paymentRecord);
+    res.send({success: true, result, paymentResult, transactionId: session.payment_intent, trackingId: trackingId, message: "Payment successful"});
+
+  }
+  
+}
+res.send({success: false, message: "Payment not successful"});
+})
 
 
 
 
-    // Send a ping to confirm a successful connection
+    // Send a ping to c onfirm a successful connection
     await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
